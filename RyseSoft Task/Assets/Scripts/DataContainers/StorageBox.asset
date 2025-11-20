@@ -1,0 +1,23 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 0}
+  m_Name: StorageBox
+  m_EditorClassIdentifier: Assembly-CSharp::StorageBoxData
+  slots:
+  - item: {fileID: 11400000, guid: 465ec7014e6e64442aa9ca98556a7998, type: 2}
+    quantity: 6
+  - item: {fileID: 11400000, guid: b0e4c785fb1c3b344a66e8c9c025a31a, type: 2}
+    quantity: 4
+  - item: {fileID: 11400000, guid: af72199cf05fe3146b36d7dc9e6ee33c, type: 2}
+    quantity: 3
+  - item: {fileID: 11400000, guid: 1e14edaffc408e044a38b5924036bc16, type: 2}
+    quantity: 7
