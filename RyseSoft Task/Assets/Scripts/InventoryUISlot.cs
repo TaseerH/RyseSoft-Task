@@ -1,26 +1,33 @@
-// InventoryUISlot.cs (updated)
+// InventoryUISlot.cs (UPDATED)
 using TMPro;
 using UnityEngine;
-using UnityEngine.UI;
 using UnityEngine.EventSystems;
+using UnityEngine.UI;
 
-public class InventoryUISlot : MonoBehaviour, IDropHandler
+public class InventoryUISlot : MonoBehaviour
 {
-    public ItemData CurrentItem { get; private set; }
+    public ItemData CurrentItem { get; set; }
     public int Quantity { get; set; } = 0;
+
+    public bool IsEmpty => CurrentItem == null || Quantity <= 0;
 
     [SerializeField] private Image iconImage;
     [SerializeField] private TMP_Text quantityText;
-    [SerializeField] private Image backgroundImage; // Optional: for highlighting
+    [SerializeField] private Image backgroundImage;
+
+    // Add this at the top
+    private CanvasGroup canvasGroup;
 
     private void Awake()
     {
-        // Auto-assign if missing
-        if (iconImage == null) iconImage = transform.Find("Icon")?.GetComponent<Image>();
+        canvasGroup = GetComponent<CanvasGroup>();
+        if (canvasGroup == null) canvasGroup = gameObject.AddComponent<CanvasGroup>();
+
+        if (iconImage == null) iconImage = GetComponentInChildren<Image>();
         if (quantityText == null) quantityText = GetComponentInChildren<TMP_Text>();
     }
 
-    public void Setup(ItemData item, int quantity = 1)
+    public void Setup(ItemData item, int quantity = 0)
     {
         CurrentItem = item;
         Quantity = quantity;
@@ -29,35 +36,31 @@ public class InventoryUISlot : MonoBehaviour, IDropHandler
 
     public void Clear()
     {
-        CurrentItem = null;
-        Quantity = 0;
-        UpdateVisuals();
+        Setup(null, 0);
     }
 
     public void UpdateVisuals()
     {
         if (iconImage != null)
-            iconImage.sprite = CurrentItem ? CurrentItem.icon : null;
+        {
+            iconImage.sprite = CurrentItem?.icon;
+            iconImage.enabled = !IsEmpty;
+        }
 
         if (quantityText != null)
-            quantityText.text = (Quantity > 1) ? Quantity.ToString() : "";
-
-        iconImage.enabled = CurrentItem != null;
-        if (quantityText) quantityText.enabled = CurrentItem != null;
+        {
+            quantityText.text = Quantity > 1 ? Quantity.ToString() : "";
+            quantityText.enabled = !IsEmpty && Quantity > 1;
+        }
     }
 
-    // Called when something is dropped on this slot
+    public void SetDragState(bool dragging)
+    {
+        canvasGroup.alpha = dragging ? 0.5f : 1f;
+    }
+
     public void OnDrop(PointerEventData eventData)
     {
-        // Handled by DraggableItem.OnEndDrag → no need here
-        // But we implement interface to accept drops
-    }
-
-    // Optional: Visual feedback on hover
-    private void OnEnable() => AddDraggableIfMissing();
-    private void AddDraggableIfMissing()
-    {
-        if (CurrentItem != null && GetComponent<DraggableItem>() == null)
-            gameObject.AddComponent<DraggableItem>();
+        // Interface required, handled by DraggableItem
     }
 }

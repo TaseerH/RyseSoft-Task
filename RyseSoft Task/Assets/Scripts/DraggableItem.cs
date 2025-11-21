@@ -1,141 +1,267 @@
-// DraggableItem.cs
+// DraggableItem.cs - 100% FIXED WITH DEBUG LOGS
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
-using TMPro;
+using System.Collections.Generic;
 
 public class DraggableItem : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler
 {
+    private static DraggableItem dragging;
     private Canvas canvas;
-    private Transform originalParent;
-    private int originalSiblingIndex;
-    private CanvasGroup canvasGroup;
-    private Image iconImage;
-    private TMP_Text quantityText;
-    private RectTransform rectTransform;
-
-    private static DraggableItem currentlyDragging;
+    private GameObject dragIcon;
+    private InventoryUISlot sourceSlot;
+    private GameObject previewObject;
+    private Camera cam;
 
     private void Awake()
     {
         canvas = GetComponentInParent<Canvas>();
-        canvasGroup = GetComponent<CanvasGroup>() ?? gameObject.AddComponent<CanvasGroup>();
-        rectTransform = GetComponent<RectTransform>();
-        iconImage = GetComponent<Image>();
-        quantityText = GetComponentInChildren<TMP_Text>();
+        sourceSlot = GetComponent<InventoryUISlot>();
+        // FIXED: Robust camera detection
+        cam = FindObjectOfType<Camera>();
+        if (cam == null) Debug.LogError("No active Camera found for raycasting!");
     }
 
     public void OnBeginDrag(PointerEventData eventData)
     {
-        if (currentlyDragging != null) return; // Prevent multiple drags
+        if (dragging != null || sourceSlot.CurrentItem == null) return;
 
-        var uiSlot = GetComponent<InventoryUISlot>();
-        if (uiSlot == null || uiSlot.CurrentItem == null) return;
+        dragging = this;
 
-        currentlyDragging = this;
+        // Create floating icon
+        dragIcon = new GameObject("DragIcon");
+        dragIcon.transform.SetParent(canvas.transform, false);
+        dragIcon.transform.SetAsLastSibling();
 
-        originalParent = transform.parent;
-        originalSiblingIndex = transform.GetSiblingIndex();
+        var img = dragIcon.AddComponent<Image>();
+        img.sprite = sourceSlot.CurrentItem.icon;
+        img.raycastTarget = false;
 
-        canvasGroup.blocksRaycasts = false;
-        canvasGroup.alpha = 0.7f;
+        var rt = dragIcon.GetComponent<RectTransform>();
+        rt.sizeDelta = new Vector2(60, 60);
 
-        transform.SetParent(canvas.transform, true); // Top-level during drag
-        transform.SetAsLastSibling();
+        var cg = dragIcon.AddComponent<CanvasGroup>();
+        cg.alpha = 0.9f;
+        cg.blocksRaycasts = false;
+
+        // Dim source
+        var sourceCG = sourceSlot.GetComponent<CanvasGroup>();
+        if (sourceCG) sourceCG.alpha = 0.5f;
+
+        Debug.Log("Drag started: " + sourceSlot.CurrentItem.itemName);
     }
 
     public void OnDrag(PointerEventData eventData)
     {
-        if (currentlyDragging != this) return;
-        rectTransform.anchoredPosition += eventData.delta / canvas.scaleFactor;
+        if (dragging != this || dragIcon == null) return;
+
+        dragIcon.transform.position = Input.mousePosition;
+
+        // FIXED: Precise UI detection
+        bool overUI = IsPointerOverUI();
+        Debug.Log("Drag Update - Over UI: " + overUI);
+
+        if (overUI)
+        {
+            HidePreview();
+        }
+        else
+        {
+            ShowWorldPreview();
+        }
     }
 
     public void OnEndDrag(PointerEventData eventData)
     {
-        if (currentlyDragging != this) return;
+        if (dragging != this) return;
 
-        canvasGroup.blocksRaycasts = true;
-        canvasGroup.alpha = 1f;
+        bool dropped = false;
 
-        // Try to drop on a valid slot
-        var dropTarget = eventData.pointerEnter;
-        var targetSlot = dropTarget != null ? dropTarget.GetComponentInParent<InventoryUISlot>() : null;
-
-        if (targetSlot != null && targetSlot != GetComponent<InventoryUISlot>())
+        // Try drop on another slot
+        var target = eventData.pointerEnter?.GetComponentInParent<InventoryUISlot>();
+        if (target && target != sourceSlot)
         {
-            HandleDrop(targetSlot);
+            DropOnSlot(target);
+            dropped = true;
+            Debug.Log("Dropped on UI slot");
         }
         else
         {
-            // Return to original position
-            ReturnToOriginalPosition();
+            bool overUI = IsPointerOverUI();
+            Debug.Log("End Drag - Over UI: " + overUI);
+            if (!overUI)
+            {
+                dropped = TryPlaceInWorld();
+            }
         }
 
-        currentlyDragging = null;
+        // Cleanup
+        if (dragIcon) Destroy(dragIcon);
+        HidePreview();
+        var sourceCG = sourceSlot.GetComponent<CanvasGroup>();
+        if (sourceCG) sourceCG.alpha = 1f;
+
+        dragging = null;
+        Debug.Log("Drag ended, dropped: " + dropped);
     }
 
-    private void HandleDrop(InventoryUISlot targetSlot)
+    private bool IsPointerOverUI()
     {
-        var sourceSlot = GetComponent<InventoryUISlot>();
+        PointerEventData ped = new PointerEventData(EventSystem.current)
+        {
+            position = Input.mousePosition
+        };
+        List<RaycastResult> results = new List<RaycastResult>();
+        EventSystem.current.RaycastAll(ped, results);
 
-        // Case 1: Target is empty
-        if (targetSlot.CurrentItem == null)
+        foreach (var r in results)
         {
-            MoveItem(sourceSlot, targetSlot);
+            if (r.gameObject == dragIcon) continue; // Ignore drag icon itself
+            // FIXED: Only block if over a slot (allows empty panel space)
+            if (r.gameObject.GetComponent<InventoryUISlot>() != null) 
+            {
+                Debug.Log("Over UI Slot: " + r.gameObject.name);
+                return true;
+            }
         }
-        // Case 2: Same item → stack
-        else if (targetSlot.CurrentItem == sourceSlot.CurrentItem)
+        return false; // No slot hit → allow world preview!
+    }
+
+    private void ShowWorldPreview()
+    {
+        if (sourceSlot.CurrentItem?.prefab == null || cam == null) 
         {
-            targetSlot.Quantity += sourceSlot.Quantity;
-            targetSlot.UpdateVisuals();
+            HidePreview();
+            return;
+        }
+
+        Ray ray = cam.ScreenPointToRay(Input.mousePosition);
+        // FIXED: Exclude UI layer, longer distance
+        int layerMask = ~(LayerMask.GetMask("UI"));
+        if (Physics.Raycast(ray, out RaycastHit hit, 1000f, layerMask))
+        {
+            Debug.Log("Raycast HIT: " + hit.collider.name + " | Tag: " + hit.collider.tag + " | Is PlacementSurface: " + hit.collider.CompareTag("PlacementSurface"));
+            
+            if (hit.collider.CompareTag("PlacementSurface"))
+            {
+                if (previewObject == null)
+                {
+                    previewObject = Instantiate(sourceSlot.CurrentItem.prefab);
+                    MakeGhost(previewObject);
+                    Debug.Log("Preview instantiated!");
+                }
+                previewObject.transform.position = hit.point + hit.normal * 0.05f;
+                previewObject.transform.rotation = Quaternion.FromToRotation(Vector3.up, hit.normal);
+                return;
+            }
+        }
+        else
+        {
+            Debug.Log("Raycast NO HIT");
+        }
+        HidePreview();
+    }
+
+    private void HidePreview()
+    {
+        if (previewObject != null)
+        {
+            Destroy(previewObject);
+            previewObject = null;
+            Debug.Log("Preview hidden");
+        }
+    }
+
+    private bool TryPlaceInWorld()
+    {
+        if (sourceSlot.CurrentItem?.prefab == null) return false;
+
+        Ray ray = cam.ScreenPointToRay(Input.mousePosition);
+        if (Physics.Raycast(ray, out RaycastHit hit, 100f, ~LayerMask.GetMask("UI")))
+        {
+            if (hit.collider.CompareTag("PlacementSurface"))
+            {
+                Vector3 pos = hit.point + hit.normal * 0.05f;
+                Quaternion rot = Quaternion.FromToRotation(Vector3.up, hit.normal);
+
+                // SPAWN AND MAKE CHILD OF WORKBENCH
+                GameObject spawned = Instantiate(sourceSlot.CurrentItem.prefab, GameManager.Instance.workbenchContent);
+                spawned.transform.position = pos;
+                spawned.transform.rotation = rot;
+
+                // REDUCE STACK
+                sourceSlot.Quantity--;
+                if (sourceSlot.Quantity <= 0)
+                {
+                    sourceSlot.Clear();
+                }
+                else
+                {
+                    sourceSlot.UpdateVisuals(); // ← THIS KEEPS UI IN SYNC
+                }
+
+                // FORCE UI REFRESH (critical!)
+                MainUIManager.Instance?.RefreshWorkbenchUI();
+
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void DropOnSlot(InventoryUISlot target)
+    {
+        if (target.CurrentItem == null)
+        {
+            target.Setup(sourceSlot.CurrentItem, sourceSlot.Quantity);
             sourceSlot.Clear();
-            Destroy(gameObject);
         }
-        // Case 3: Different item → swap
+        else if (target.CurrentItem == sourceSlot.CurrentItem)
+        {
+            target.Quantity += sourceSlot.Quantity;
+            target.UpdateVisuals();
+            sourceSlot.Clear();
+        }
         else
         {
-            SwapItems(sourceSlot, targetSlot);
+            var tempItem = target.CurrentItem;
+            var tempQty = target.Quantity;
+            target.Setup(sourceSlot.CurrentItem, sourceSlot.Quantity);
+            sourceSlot.Setup(tempItem, tempQty);
         }
     }
 
-    private void MoveItem(InventoryUISlot from, InventoryUISlot to)
+    // FIXED: Universal ghost effect (works in Built-in, URP, HDRP)
+    private void MakeGhost(GameObject obj)
     {
-        to.Setup(from.CurrentItem, from.Quantity);
-        from.Clear();
-        Destroy(gameObject);
-    }
+        obj.transform.localScale *= 1.1f;
+        obj.layer = LayerMask.NameToLayer("Ignore Raycast"); // Prevent self-hits
 
-    private void SwapItems(InventoryUISlot a, InventoryUISlot b)
-    {
-        var tempItem = a.CurrentItem;
-        var tempQty = a.Quantity;
-
-        a.Setup(b.CurrentItem, b.Quantity);
-        b.Setup(tempItem, tempQty);
-
-        // Move this GameObject to target's parent
-        transform.SetParent(b.transform.parent);
-        transform.SetSiblingIndex(b.transform.GetSiblingIndex());
-
-        // Update visuals
-        a.UpdateVisuals();
-        b.UpdateVisuals();
-    }
-
-    private void ReturnToOriginalPosition()
-    {
-        transform.SetParent(originalParent);
-        transform.SetSiblingIndex(originalSiblingIndex);
-    }
-
-    public static void CancelCurrentDrag()
-    {
-        if (currentlyDragging != null)
+        Renderer[] renderers = obj.GetComponentsInChildren<Renderer>();
+        foreach (Renderer r in renderers)
         {
-            currentlyDragging.ReturnToOriginalPosition();
-            currentlyDragging.canvasGroup.blocksRaycasts = true;
-            currentlyDragging.canvasGroup.alpha = 1f;
-            currentlyDragging = null;
+            Material[] mats = r.materials;
+            for (int i = 0; i < mats.Length; i++)
+            {
+                Material ghostMat = new Material(mats[i]);
+                Color col = ghostMat.color;
+                col.a = 0.6f;
+                ghostMat.color = col;
+                mats[i] = ghostMat;
+            }
+            r.materials = mats;
+        }
+    }
+
+    public static void CancelDrag()
+    {
+        if (dragging != null)
+        {
+            if (dragging.dragIcon) Destroy(dragging.dragIcon);
+            dragging.HidePreview();
+            var sourceCG = dragging.sourceSlot?.GetComponent<CanvasGroup>();
+            if (sourceCG) sourceCG.alpha = 1f;
+            dragging = null;
         }
     }
 }

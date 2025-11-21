@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using Cinemachine;
+using UnityEngine.UI;
 
 public class GameManager : MonoBehaviour
 {
@@ -12,7 +13,11 @@ public class GameManager : MonoBehaviour
     public CinemachineVirtualCamera workbenchCamera;
     public MainUIManager uiManager;
 
+    public BoxCollider WorkbenchTrigger;
+    
     public GameObject InteractionCanvas;
+
+    public Transform workbenchContent; // Parent of all placed items
     
     [Header("Data (Assign in Inspector)")]
     public InventoryData playerInventoryData;
@@ -74,6 +79,7 @@ public class GameManager : MonoBehaviour
 
         // Disable player
         playerObject.SetActive(false);
+        WorkbenchTrigger.enabled = (false);
 
         Cursor.lockState = CursorLockMode.None;
         Cursor.visible = true;
@@ -93,10 +99,12 @@ public class GameManager : MonoBehaviour
 
     public void CloseWorkbench()
     {
-        DraggableItem.CancelCurrentDrag(); // Critical!
+        DraggableItem.CancelDrag();
         
         if (playerObject == null || uiManager == null) return;
 
+        WorkbenchTrigger.enabled = (true);
+        
         // Save current UI state back to ScriptableObjects
         uiManager.SaveCurrentWorkbenchData(
             ref playerInventoryData.slots,
@@ -106,6 +114,13 @@ public class GameManager : MonoBehaviour
         // Hide UI and clear slots
         uiManager.HideWorkbench();
 
+        // Clean up any leftover items on the workbench
+        foreach (Transform child in workbenchContent)
+        {
+            if (child.gameObject.activeInHierarchy)
+                Destroy(child.gameObject);
+        }
+        
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
         

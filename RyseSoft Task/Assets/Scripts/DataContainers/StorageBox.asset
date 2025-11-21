@@ -9,15 +9,11 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 0}
+  m_Script: {fileID: 11500000, guid: c05d173da29730e46b90888181a12ed3, type: 3}
   m_Name: StorageBox
-  m_EditorClassIdentifier: Assembly-CSharp::StorageBoxData
+  m_EditorClassIdentifier: 
   slots:
-  - item: {fileID: 11400000, guid: 465ec7014e6e64442aa9ca98556a7998, type: 2}
-    quantity: 6
-  - item: {fileID: 11400000, guid: b0e4c785fb1c3b344a66e8c9c025a31a, type: 2}
-    quantity: 4
-  - item: {fileID: 11400000, guid: af72199cf05fe3146b36d7dc9e6ee33c, type: 2}
-    quantity: 3
+  - item: {fileID: 11400000, guid: 3c8fe4fe9725cc74abf5e252f7d353af, type: 2}
+    quantity: 1
   - item: {fileID: 11400000, guid: 1e14edaffc408e044a38b5924036bc16, type: 2}
-    quantity: 7
+    quantity: 1

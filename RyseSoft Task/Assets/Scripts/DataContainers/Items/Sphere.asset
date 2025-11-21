@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: Sphere
   m_EditorClassIdentifier: 
   itemName: Sphere
-  prefab: {fileID: 0}
+  prefab: {fileID: 9069602596699398554, guid: e226bf25be77b7a42a4c91b41fdb483a, type: 3}
   mesh: {fileID: 10207, guid: 0000000000000000e000000000000000, type: 0}
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: 70e59b96ade34104cb2de6423ff4f792, type: 3}
   description: 

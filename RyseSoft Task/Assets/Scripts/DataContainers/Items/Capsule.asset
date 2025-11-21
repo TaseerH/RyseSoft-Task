@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: Capsule
   m_EditorClassIdentifier: 
   itemName: Capsule
-  prefab: {fileID: 0}
+  prefab: {fileID: 4338746839407633021, guid: b83e536df6e5937489594dd7551ff4de, type: 3}
   mesh: {fileID: 10208, guid: 0000000000000000e000000000000000, type: 0}
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: 996be7982cfa68a478d0c84bbfbdb2a8, type: 3}
   description: 

@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: Cylinder
   m_EditorClassIdentifier: 
   itemName: Cylinder
-  prefab: {fileID: 0}
+  prefab: {fileID: 2776737429001031067, guid: 45cc7361a31e1674a9cfd20dae898393, type: 3}
   mesh: {fileID: 10206, guid: 0000000000000000e000000000000000, type: 0}
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: a89e9a208e7325e4c884212a668addec, type: 3}
   description: 
