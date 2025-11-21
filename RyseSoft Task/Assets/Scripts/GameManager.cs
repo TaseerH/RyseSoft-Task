@@ -93,6 +93,8 @@ public class GameManager : MonoBehaviour
 
     public void CloseWorkbench()
     {
+        DraggableItem.CancelCurrentDrag(); // Critical!
+        
         if (playerObject == null || uiManager == null) return;
 
         // Save current UI state back to ScriptableObjects

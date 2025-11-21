@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.EventSystems;
 
 public class MainUIManager : MonoBehaviour
 {
@@ -20,8 +21,19 @@ public class MainUIManager : MonoBehaviour
         playerInventory.inventoryPanel.SetActive(true);
         storageBox.storagePanel.SetActive(true);
 
+        // Add DropZone component to parents so they accept drops
+        AddDropZone(playerInventory.itemSlotParent.gameObject);
+        AddDropZone(storageBox.itemSlotParent.gameObject);
+
         PopulateSlots(playerInventory.itemSlotParent, playerSlots, playerSlotPrefab);
         PopulateSlots(storageBox.itemSlotParent, storageSlots, storageSlotPrefab);
+    }
+
+    private void AddDropZone(GameObject parentObj)
+    {
+        var dropZone = parentObj.GetComponent<DropZone>();
+        if (dropZone == null)
+            parentObj.AddComponent<DropZone>();
     }
 
     public void HideWorkbench()
@@ -104,4 +116,15 @@ public class StorageBoxUI
 {
     public GameObject storagePanel;
     public Transform itemSlotParent;
+}
+
+// New helper class inside MainUIManager.cs or separate file
+public class DropZone : MonoBehaviour, IDropHandler
+{
+    public void OnDrop(PointerEventData eventData)
+    {
+        // If dragged item is released over empty space in inventory panel,
+        // allow dropping into a new empty slot (optional advanced feature)
+        // For now, we rely only on slot targets — this is safe fallback
+    }
 }
