@@ -1,4 +1,4 @@
-// CraftManager.cs - HDRP + Build Compatible
+// CraftManager.cs - Runtime Only
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.Rendering;
@@ -6,23 +6,19 @@ using UnityEngine.Rendering.HighDefinition;
 using System.IO;
 using System.Collections.Generic;
 using Cinemachine;
-#if UNITY_EDITOR
-using UnityEditor;
-#endif
 
 public class CraftManager : MonoBehaviour
 {
-public static CraftManager Instance;
+    public static CraftManager Instance;
 
     [Header("UI References")]
-    public Button craftButton;           // Shown only when items present
-    public GameObject namingPanel;       // Shown only after successful trace
+    public Button craftButton;
+    public GameObject namingPanel;
     public TMPro.TMP_InputField nameInput;
     public Button confirmButton;
 
     [Header("Workbench")]
-    public Transform workbenchContent;   // Parent of placed items
-
+    public Transform workbenchContent;
     public Transform workbenchPlacementCollider;
     public string workbenchTag = "WorkbenchArea";
 
@@ -34,22 +30,20 @@ public static CraftManager Instance;
     private LineRenderer currentTrace;
     private List<Vector3> targetPath;
     private bool isTracing = false;
+    private bool hasStartedTracing = false;
 
     private void Awake()
     {
         Instance = this;
 
-        // Hide everything at start
         craftButton.gameObject.SetActive(false);
         namingPanel.SetActive(false);
         
-        workbenchContent.gameObject.GetComponent<BoxCollider>().enabled = (false); // Hide workbench by default
-
+        workbenchContent.gameObject.GetComponent<BoxCollider>().enabled = false;
+        
         craftButton.onClick.AddListener(StartCrafting);
         confirmButton.onClick.AddListener(ConfirmCraft);
     }
-
-    private bool hasStartedTracing = false; // ← ADD THIS at the top of the class
 
     private void Update()
     {
@@ -59,7 +53,7 @@ public static CraftManager Instance;
 
         if (Input.GetMouseButtonDown(0))
         {
-            hasStartedTracing = true; // Player officially started the trace
+            hasStartedTracing = true;
         }
 
         if (Input.GetMouseButton(0) && hasStartedTracing)
@@ -87,7 +81,6 @@ public static CraftManager Instance;
             }
         }
 
-        // ONLY fail if player started tracing AND released the button before finishing
         if (hasStartedTracing && Input.GetMouseButtonUp(0) && targetPath.Count > 1)
         {
             CraftFailed();
@@ -103,7 +96,6 @@ public static CraftManager Instance;
                 itemCount++;
         }
 
-        // Show Craft button only if 2+ items
         bool canCraft = itemCount >= 2;
         if (craftButton.gameObject.activeSelf != canCraft)
         {
@@ -113,9 +105,8 @@ public static CraftManager Instance;
 
     public void StartCrafting()
     {
-        
-        workbenchContent.gameObject.GetComponent<BoxCollider>().enabled = true; // Ensure workbench is visible
-        workbenchPlacementCollider.gameObject.GetComponent<BoxCollider>().enabled = (false); // Disable placement collider
+        workbenchContent.gameObject.GetComponent<BoxCollider>().enabled = true;
+        workbenchPlacementCollider.gameObject.GetComponent<BoxCollider>().enabled = false;
         
         workbenchItems.Clear();
         foreach (Transform child in workbenchContent)
@@ -129,8 +120,6 @@ public static CraftManager Instance;
         GenerateTracePath();
         ShowTraceGuide();
         isTracing = true;
-
-        // Hide craft button during tracing
         craftButton.gameObject.SetActive(false);
     }
 
@@ -138,9 +127,7 @@ public static CraftManager Instance;
     {
         targetPath = new List<Vector3>();
         Vector3 center = GetCenter();
-
-        // Spawn HIGHER above small objects
-        float traceHeight = center.y + 0.25f; // ← HIGHER: 0.18 above center
+        float traceHeight = center.y + 0.25f;
 
         int segments = workbenchItems.Count + 2;
         for (int i = 0; i < segments; i++)
@@ -149,7 +136,7 @@ public static CraftManager Instance;
             float radius = 0.08f + (i % 3) * 0.03f;
             Vector3 offset = new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle)) * radius;
             Vector3 pos = center + offset;
-            pos.y = traceHeight; // ← FIXED HEIGHT
+            pos.y = traceHeight;
             targetPath.Add(pos);
         }
         targetPath.Add(targetPath[0]);
@@ -170,10 +157,8 @@ public static CraftManager Instance;
         mat.EnableKeyword("_EMISSIVE_COLOR_MAP");
         currentTrace.material = mat;
     
-        // ← FIXED: TINY WIDTH FOR SCALE 0.2
         currentTrace.startWidth = 0.025f;
         currentTrace.endWidth = 0.025f;
-        //currentTrace.widthMultiplier = 1f;
     }
 
     private void CraftSuccess()
@@ -181,7 +166,6 @@ public static CraftManager Instance;
         isTracing = false;
         currentTrace.material.SetColor("_EmissiveColor", Color.green * 15f);
 
-        // NOW show naming panel
         namingPanel.SetActive(true);
         nameInput.text = "";
         nameInput.Select();
@@ -199,141 +183,146 @@ public static CraftManager Instance;
         if (currentTrace) Destroy(currentTrace.gameObject);
         namingPanel.SetActive(false);
         isTracing = false;
-        hasStartedTracing = false; // ← ADD THIS
+        hasStartedTracing = false;
         UpdateCraftButtonVisibility();
     }
 
     public void ConfirmCraft()
     {
         string name = string.IsNullOrEmpty(nameInput.text) ? "Unnamed Creation" : nameInput.text.Trim();
-        CreateNewItemHDRP(name);
+        CreateNewItemRuntime(name);
         namingPanel.SetActive(false);
         nameInput.text = "";
         
-        workbenchContent.gameObject.GetComponent<BoxCollider>().enabled = (false); // Hide workbench after crafting
-        workbenchPlacementCollider.gameObject.GetComponent<BoxCollider>().enabled = (true); // Enable placement collider again
-        
+        workbenchContent.gameObject.GetComponent<BoxCollider>().enabled = false;
+        workbenchPlacementCollider.gameObject.GetComponent<BoxCollider>().enabled = true;
     }
 
-    private void CreateNewItemHDRP(string itemName)
-{
-    // === STEP 1: Calculate exact center of all workbench items ===
-    Bounds totalBounds = new Bounds(workbenchItems[0].transform.position, Vector3.zero);
-    foreach (var item in workbenchItems)
+    private void CreateNewItemRuntime(string itemName)
     {
-        var rend = item.GetComponentInChildren<Renderer>();
-        if (rend) totalBounds.Encapsulate(rend.bounds);
-    }
-    Vector3 geometricCenter = totalBounds.center;
-
-    // === STEP 2: Create root object at world center (will move later) ===
-    GameObject finalGO = new GameObject(itemName);
-    finalGO.transform.position = geometricCenter;
-    finalGO.transform.rotation = Quaternion.identity;
-    finalGO.transform.localScale = Vector3.one;
-
-    // === STEP 3: Combine all meshes relative to this center ===
-    var combine = new CombineInstance[workbenchItems.Count];
-    Material[] sharedMaterials = null;
-
-    for (int i = 0; i < workbenchItems.Count; i++)
-    {
-        var mf = workbenchItems[i].GetComponentInChildren<MeshFilter>();
-        var mr = workbenchItems[i].GetComponentInChildren<MeshRenderer>();
-        if (mf && mr)
+        Bounds totalBounds = new Bounds(workbenchItems[0].transform.position, Vector3.zero);
+        foreach (var item in workbenchItems)
         {
-            combine[i].mesh = mf.sharedMesh;
-            combine[i].transform = finalGO.transform.worldToLocalMatrix * mf.transform.localToWorldMatrix;
-            if (sharedMaterials == null) sharedMaterials = mr.sharedMaterials;
+            var rend = item.GetComponentInChildren<Renderer>();
+            if (rend) totalBounds.Encapsulate(rend.bounds);
         }
+        Vector3 geometricCenter = totalBounds.center;
+
+        GameObject finalGO = new GameObject(itemName);
+        finalGO.transform.position = geometricCenter;
+        finalGO.transform.rotation = Quaternion.identity;
+        finalGO.transform.localScale = Vector3.one;
+
+        var combine = new CombineInstance[workbenchItems.Count];
+        Material[] sharedMaterials = null;
+
+        for (int i = 0; i < workbenchItems.Count; i++)
+        {
+            var mf = workbenchItems[i].GetComponentInChildren<MeshFilter>();
+            var mr = workbenchItems[i].GetComponentInChildren<MeshRenderer>();
+            if (mf && mr)
+            {
+                combine[i].mesh = mf.sharedMesh;
+                combine[i].transform = finalGO.transform.worldToLocalMatrix * mf.transform.localToWorldMatrix;
+                if (sharedMaterials == null) sharedMaterials = mr.sharedMaterials;
+            }
+        }
+
+        Mesh finalMesh = new Mesh();
+        finalMesh.name = itemName + "_Mesh";
+        finalMesh.CombineMeshes(combine, true, true);
+
+        finalMesh.RecalculateBounds();
+        Vector3 pivotOffset = finalMesh.bounds.center;
+        Vector3[] vertices = finalMesh.vertices;
+        for (int i = 0; i < vertices.Length; i++)
+            vertices[i] -= pivotOffset;
+        finalMesh.vertices = vertices;
+        finalMesh.RecalculateBounds();
+
+        var filter = finalGO.AddComponent<MeshFilter>();
+        filter.sharedMesh = finalMesh;
+
+        var renderer = finalGO.AddComponent<MeshRenderer>();
+        renderer.sharedMaterials = sharedMaterials ?? new Material[] { new Material(Shader.Find("HDRP/Lit")) };
+
+        finalGO.transform.position += finalGO.transform.TransformVector(pivotOffset);
+
+        Texture2D iconTex = CaptureIconHDRP(finalGO);
+        string description = $"Player-crafted fusion of {workbenchItems.Count} items";
+
+        // Save to runtime system
+        RuntimeItemManager.Instance.SavePlayerCreatedItem(itemName, finalMesh, iconTex, description);
+        
+        // Create runtime item and add to storage
+        ItemData runtimeItemData = CreateRuntimeItemData(itemName, finalMesh, iconTex, description);
+        AddItemToStorage(runtimeItemData);
+        
+        // Notify save system
+        RuntimeItemManager.Instance.OnItemCrafted(runtimeItemData);
+
+        // Cleanup
+        foreach (var item in workbenchItems)
+            if (item) Destroy(item.gameObject);
+        Destroy(finalGO);
     }
 
-    // === STEP 4: Create final mesh ===
-    Mesh finalMesh = new Mesh();
-    finalMesh.name = itemName + "_Mesh";
-    finalMesh.CombineMeshes(combine, true, true);
+    private ItemData CreateRuntimeItemData(string itemName, Mesh mesh, Texture2D icon, string description)
+    {
+        GameObject runtimePrefab = new GameObject(itemName);
+        MeshFilter filter = runtimePrefab.AddComponent<MeshFilter>();
+        MeshRenderer renderer = runtimePrefab.AddComponent<MeshRenderer>();
+        
+        filter.sharedMesh = mesh;
+        
+        Material material = new Material(Shader.Find("HDRP/Lit"));
+        if (workbenchItems.Count > 0)
+        {
+            var sourceRenderer = workbenchItems[0].GetComponentInChildren<Renderer>();
+            if (sourceRenderer != null && sourceRenderer.sharedMaterial != null)
+            {
+                material.CopyPropertiesFromMaterial(sourceRenderer.sharedMaterial);
+            }
+        }
+        renderer.sharedMaterial = material;
+        
+        runtimePrefab.AddComponent<MeshCollider>();
+        
+        ItemData itemData = ScriptableObject.CreateInstance<ItemData>();
+        itemData.itemName = itemName;
+        itemData.prefab = runtimePrefab;
+        itemData.mesh = mesh;
+        
+        Sprite iconSprite = Sprite.Create(icon, new Rect(0, 0, icon.width, icon.height), new Vector2(0.5f, 0.5f));
+        itemData.icon = iconSprite;
+        itemData.description = description;
+        
+        return itemData;
+    }
 
-    // === STEP 5: RECENTER PIVOT TO GEOMETRIC CENTER (THE MAGIC) ===
-    finalMesh.RecalculateBounds();
-    Vector3 pivotOffset = finalMesh.bounds.center; // This is how far vertices are from (0,0,0)
-    Vector3[] vertices = finalMesh.vertices;
-    for (int i = 0; i < vertices.Length; i++)
-        vertices[i] -= pivotOffset;
-    finalMesh.vertices = vertices;
-    finalMesh.RecalculateBounds(); // Final bounds now centered at origin
-
-    // === STEP 6: Assign mesh & renderer ===
-    var filter = finalGO.AddComponent<MeshFilter>();
-    filter.sharedMesh = finalMesh;
-
-    var renderer = finalGO.AddComponent<MeshRenderer>();
-    renderer.sharedMaterials = sharedMaterials ?? new Material[] { new Material(Shader.Find("HDRP/Lit")) };
-
-    // === STEP 7: Move object so visual center stays in world, but pivot is at 0,0,0 ===
-    finalGO.transform.position += finalGO.transform.TransformVector(pivotOffset);
-
-#if UNITY_EDITOR
-    // === STEP 8: SAVE EVERYTHING TO DISK ===
-    string folder = "Assets/PlayerCreatedItems/";
-    Directory.CreateDirectory(folder + "Meshes");
-    Directory.CreateDirectory(folder + "Icons");
-    Directory.CreateDirectory(folder + "Prefabs");
-    Directory.CreateDirectory(folder + "Data");
-
-    // Save Mesh
-    string meshPath = folder + "Meshes/" + itemName + ".mesh";
-    AssetDatabase.CreateAsset(finalMesh, meshPath);
-
-    // Capture & Save Icon as Sprite
-    Texture2D iconTex = CaptureIconHDRP(finalGO);
-    string iconPath = folder + "Icons/" + itemName + ".png";
-    File.WriteAllBytes(iconPath, iconTex.EncodeToPNG());
-
-    AssetDatabase.Refresh();
-    var importer = (TextureImporter)AssetImporter.GetAtPath(iconPath);
-    importer.textureType = TextureImporterType.Sprite;
-    importer.spriteImportMode = SpriteImportMode.Single;
-    importer.spritePixelsPerUnit = 100;
-    importer.alphaIsTransparency = true;
-    importer.mipmapEnabled = false;
-    importer.filterMode = FilterMode.Bilinear;
-    importer.SaveAndReimport();
-
-    Sprite iconSprite = AssetDatabase.LoadAssetAtPath<Sprite>(iconPath);
-
-    // Save Prefab
-    string prefabPath = folder + "Prefabs/" + itemName + ".prefab";
-    GameObject savedPrefab = PrefabUtility.SaveAsPrefabAsset(finalGO, prefabPath);
-
-    // Create & Save ItemData
-    string dataPath = folder + "Data/" + itemName + ".asset";
-    ItemData newItem = ScriptableObject.CreateInstance<ItemData>();
-    newItem.itemName = itemName;
-    newItem.prefab = savedPrefab;
-    newItem.mesh = finalMesh;
-    newItem.icon = iconSprite;
-    newItem.description = $"Player-crafted fusion of {workbenchItems.Count} items";
-
-    AssetDatabase.CreateAsset(newItem, dataPath);
-    AssetDatabase.SaveAssets();
-    AssetDatabase.Refresh();
-
-    // === STEP 9: Add to storage & update UI ===
-    GameManager.Instance.storageBoxData.slots.Add(new InventorySlot(newItem, 1));
-    MainUIManager.Instance.RefreshWorkbenchUI();
-
-    Debug.Log($"[CRAFT SUCCESS] '{itemName}' created with PERFECT center pivot!");
-#endif
-
-    // === STEP 10: Cleanup ===
-    foreach (var item in workbenchItems)
-        if (item) Destroy(item.gameObject);
-    Destroy(finalGO);
-}
+    private void AddItemToStorage(ItemData itemData)
+    {
+        bool itemExists = false;
+        foreach (var slot in GameManager.Instance.storageBoxData.slots)
+        {
+            if (slot.item != null && slot.item.itemName == itemData.itemName)
+            {
+                slot.quantity++;
+                itemExists = true;
+                break;
+            }
+        }
+        
+        if (!itemExists)
+        {
+            GameManager.Instance.storageBoxData.slots.Add(new InventorySlot(itemData, 1));
+        }
+        
+        MainUIManager.Instance?.RefreshWorkbenchUI();
+    }
 
     private Texture2D CaptureIconHDRP(GameObject target)
     {
-        // Temporarily center the object for perfect framing
         Vector3 originalPos = target.transform.position;
         target.transform.position = Vector3.zero;
 
@@ -350,10 +339,9 @@ public static CraftManager Instance;
 
         cam.targetTexture = rt;
         cam.clearFlags = CameraClearFlags.Color;
-        cam.backgroundColor = new Color(0, 0, 0, 0); // Transparent background
+        cam.backgroundColor = new Color(0, 0, 0, 0);
         cam.cullingMask = LayerMask.GetMask("Default");
 
-        // Ensure target is visible
         int originalLayer = target.layer;
         foreach (Transform t in target.GetComponentsInChildren<Transform>(true))
             t.gameObject.layer = LayerMask.NameToLayer("Default");
@@ -365,7 +353,6 @@ public static CraftManager Instance;
         tex.ReadPixels(new Rect(0, 0, 256, 256), 0, 0);
         tex.Apply();
 
-        // Restore camera
         cam.targetTexture = oldRT;
         cam.clearFlags = oldClear;
         cam.backgroundColor = oldBG;
@@ -374,7 +361,6 @@ public static CraftManager Instance;
         rt.Release();
         Destroy(rt);
         
-        // Restore position
         target.transform.position = originalPos;
 
         return tex;
@@ -382,16 +368,14 @@ public static CraftManager Instance;
     
     private Camera GetWorkbenchCamera()
     {
-        // METHOD 1: Try Cinemachine (most common)
         if (GameManager.Instance.workbenchCamera != null)
         {
             var brain = Camera.main?.GetComponent<CinemachineBrain>();
             if (brain != null && brain.ActiveVirtualCamera != null)
             {
-                return Camera.main; // This IS the active workbench camera when workbench is open
+                return Camera.main;
             }
 
-            // Fallback: direct from virtual cam
             var vcam = GameManager.Instance.workbenchCamera;
             if (vcam.Follow != null)
             {
@@ -401,10 +385,8 @@ public static CraftManager Instance;
             }
         }
 
-        // METHOD 2: Fallback to main camera
         if (Camera.main != null) return Camera.main;
 
-        // METHOD 3: Find any active camera
         var anyCam = FindObjectOfType<Camera>();
         if (anyCam != null) return anyCam;
 

@@ -42,6 +42,12 @@ public class GameManager : MonoBehaviour
         // Ensure camera starts disabled
         if (workbenchCamera) workbenchCamera.gameObject.SetActive(false);
     }
+    
+    private void Start()
+    {
+        // Load player-created items into storage and inventory
+        RuntimeItemManager.Instance.LoadAllPlayerItemsIntoGame();
+    }
 
     private void Update()
     {
@@ -100,16 +106,19 @@ public class GameManager : MonoBehaviour
     public void CloseWorkbench()
     {
         DraggableItem.CancelDrag();
-        
+    
         if (playerObject == null || uiManager == null) return;
 
-        WorkbenchTrigger.enabled = (true);
-        
+        WorkbenchTrigger.enabled = true;
+    
         // Save current UI state back to ScriptableObjects
         uiManager.SaveCurrentWorkbenchData(
             ref playerInventoryData.slots,
             ref storageBoxData.slots
         );
+
+        // Save to persistent storage
+        RuntimeItemManager.Instance.SaveCurrentGameState();
 
         // Hide UI and clear slots
         uiManager.HideWorkbench();
@@ -120,10 +129,10 @@ public class GameManager : MonoBehaviour
             if (child.gameObject.activeInHierarchy)
                 Destroy(child.gameObject);
         }
-        
+    
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
-        
+    
         // Re-enable player
         playerObject.SetActive(true);
 

@@ -184,12 +184,10 @@ public class DraggableItem : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
                 Vector3 pos = hit.point + hit.normal * 0.05f;
                 Quaternion rot = Quaternion.FromToRotation(Vector3.up, hit.normal);
 
-                // SPAWN AND MAKE CHILD OF WORKBENCH
                 GameObject spawned = Instantiate(sourceSlot.CurrentItem.prefab, GameManager.Instance.workbenchContent);
                 spawned.transform.position = pos;
                 spawned.transform.rotation = rot;
 
-                // REDUCE STACK
                 sourceSlot.Quantity--;
                 if (sourceSlot.Quantity <= 0)
                 {
@@ -197,17 +195,18 @@ public class DraggableItem : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
                 }
                 else
                 {
-                    sourceSlot.UpdateVisuals(); // ← THIS KEEPS UI IN SYNC
+                    sourceSlot.UpdateVisuals();
                 }
 
-                // FORCE UI REFRESH (critical!)
                 MainUIManager.Instance?.RefreshWorkbenchUI();
+                RuntimeItemManager.Instance.OnInventoryChanged();
 
                 return true;
             }
         }
         return false;
     }
+
 
     private void DropOnSlot(InventoryUISlot target)
     {
@@ -229,6 +228,9 @@ public class DraggableItem : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
             target.Setup(sourceSlot.CurrentItem, sourceSlot.Quantity);
             sourceSlot.Setup(tempItem, tempQty);
         }
+    
+        // Notify save system of inventory changes
+        RuntimeItemManager.Instance.OnInventoryChanged();
     }
 
     // FIXED: Universal ghost effect (works in Built-in, URP, HDRP)

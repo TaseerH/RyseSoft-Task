@@ -13,7 +13,11 @@ MonoBehaviour:
   m_Name: StorageBox
   m_EditorClassIdentifier: 
   slots:
-  - item: {fileID: 11400000, guid: 3c8fe4fe9725cc74abf5e252f7d353af, type: 2}
+  - item: {fileID: 0}
     quantity: 1
-  - item: {fileID: 11400000, guid: 1e14edaffc408e044a38b5924036bc16, type: 2}
+  - item: {fileID: 0}
+    quantity: 1
+  - item: {fileID: 0}
+    quantity: 1
+  - item: {fileID: 0}
     quantity: 1

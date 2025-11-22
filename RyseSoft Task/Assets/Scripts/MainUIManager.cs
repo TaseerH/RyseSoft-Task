@@ -27,12 +27,12 @@ public class MainUIManager : MonoBehaviour
         List<InventorySlot> playerSlots,
         List<InventorySlot> storageSlots,
         GameObject playerSlotPrefab,
-        GameObject storageSlotPrefab)
+        GameObject storageSlotPrefab, bool openUI = true)
     {
         ClearAllSlots();
 
-        playerInventory.inventoryPanel.SetActive(true);
-        storageBox.storagePanel.SetActive(true);
+        playerInventory.inventoryPanel.SetActive(openUI);
+        storageBox.storagePanel.SetActive(openUI);
 
         // Ensure drop zones
         AddDropZone(playerInventory.itemSlotParent.gameObject);
@@ -49,14 +49,14 @@ public class MainUIManager : MonoBehaviour
         ClearAllSlots();
     }
     
-    public void RefreshWorkbenchUI()
+    public void RefreshWorkbenchUI(bool openUI = true)
     {
         // Re-read current data and update all slots
         ShowWorkbench(
             GameManager.Instance.playerInventoryData.slots,
             GameManager.Instance.storageBoxData.slots,
             GameManager.Instance.inventorySlotPrefab,
-            GameManager.Instance.storageSlotPrefab
+            GameManager.Instance.storageSlotPrefab, openUI
         );
     }
 
@@ -101,9 +101,11 @@ public class MainUIManager : MonoBehaviour
         playerInventoryData = ReadSlotsFromUI(playerInventory.itemSlotParent, playerSlotCount);
         storageBoxData = ReadSlotsFromUI(storageBox.itemSlotParent, storageSlotCount);
 
-        // Optional: Trim nulls from ScriptableObject (clean data)
         GameManager.Instance.playerInventoryData.slots = playerInventoryData;
         GameManager.Instance.storageBoxData.slots = storageBoxData;
+    
+        // Save to persistent storage
+        RuntimeItemManager.Instance?.SaveCurrentGameState();
     }
 
     private List<InventorySlot> ReadSlotsFromUI(Transform parent, int totalSlots)
